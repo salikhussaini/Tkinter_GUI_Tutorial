@@ -1,24 +1,46 @@
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import ttk, filedialog
 import pandas as pd
+import teradatasql
 
 class CSVUploaderApp:
     def __init__(self, root):
         self.root = root
         self.root.title("CSV Uploader")
 
-        self.file_path_label = tk.Label(root, text="No file selected")
+        self.file_path_label = ttk.Label(root, text="No file selected")
         self.file_path_label.pack(pady=10)
 
-        self.browse_button = tk.Button(root, text="Browse", command=self.browse_file)
+        self.browse_button = ttk.Button(root, text="Browse", command=self.browse_file)
         self.browse_button.pack(pady=10)
 
         self.variable_types = {}
         self.variable_lengths = {}
-        self.types_frame = tk.Frame(root)
+        self.types_frame = ttk.Frame(root)
         self.types_frame.pack(pady=10)
 
-        self.upload_button = tk.Button(root, text="Upload", command=self.upload_csv)
+        self.username_label = ttk.Label(root, text="Username:")
+        self.username_label.pack()
+        self.username_entry = ttk.Entry(root)
+        self.username_entry.pack(pady=5)
+
+        self.password_label = ttk.Label(root, text="Password:")
+        self.password_label.pack()
+        self.password_entry = ttk.Entry(root, show="*")
+        self.password_entry.pack(pady=10)
+
+        self.connect_button = ttk.Button(root, text="Connect to Teradata", command=self.connect_to_teradata)
+        self.connect_button.pack(pady=10)
+
+        self.status_var = tk.StringVar()
+        self.status_bar = ttk.Label(root, textvariable=self.status_var)
+        self.status_bar.pack(pady=5)
+
+        self.error_var = tk.StringVar()
+        self.error_bar = ttk.Label(root, textvariable=self.error_var, foreground="red")
+        self.error_bar.pack(pady=5)
+
+        self.upload_button = ttk.Button(root, text="Upload", command=self.upload_csv)
         self.upload_button.pack(pady=10)
 
     def browse_file(self):
@@ -29,37 +51,28 @@ class CSVUploaderApp:
     def load_csv(self, file_path):
         try:
             df = pd.read_csv(file_path)
-            self.show_variable_types(df)
         except pd.errors.EmptyDataError:
-            print("Selected file is empty.")
+            self.show_error("Selected file is empty.")
 
-    def show_variable_types(self, df):
-        for widget in self.types_frame.winfo_children():
-            widget.destroy()
+    def connect_to_teradata(self):
+        username = self.username_entry.get()
+        password = self.password_entry.get()
 
-        for column in df.columns:
-            label = tk.Label(self.types_frame, text=column)
-            label.grid(row=0, column=df.columns.get_loc(column))
+        if not username or not password:
+            self.show_error("Please enter both username and password.")
+            return
 
-            variable_type = tk.StringVar(self.root)
-            variable_type.set("VARCHAR")
-            options = ["VARCHAR", "DATE", "CHAR"]
-
-            dropdown = tk.OptionMenu(self.types_frame, variable_type, *options)
-            dropdown.grid(row=1, column=df.columns.get_loc(column))
-
-            if variable_type.get() == "VARCHAR":
-                length_entry = tk.Entry(self.types_frame, width=5)
-                length_entry.grid(row=2, column=df.columns.get_loc(column))
-                self.variable_lengths[column] = length_entry
-
-            self.variable_types[column] = variable_type
+        try:
+            with teradatasql.connect(host='your_teradata_host', user=username, password=password) as connection:
+                self.show_status("Connected to Teradata")
+        except teradatasql.DatabaseError as e:
+            self.show_error(f"Error connecting to Teradata: {e}")
 
     def upload_csv(self):
         file_path = self.file_path_label.cget("text")
 
         if file_path == "No file selected":
-            print("Please select a CSV file.")
+            self.show_error("Please select a CSV file.")
             return
 
         variable_types = {column: var.get() for column, var in self.variable_types.items()}
@@ -68,6 +81,14 @@ class CSVUploaderApp:
         print("File Path:", file_path)
         print("Variable Types:", variable_types)
         print("Variable Lengths:", variable_lengths)
+
+    def show_status(self, message):
+        self.status_var.set(message)
+        self.root.update_idletasks()
+
+    def show_error(self, message):
+        self.error_var.set(message)
+        self.root.update_idletasks()
 
 if __name__ == "__main__":
     root = tk.Tk()
