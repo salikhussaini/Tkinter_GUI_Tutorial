@@ -43,6 +43,9 @@ class CSVUploaderApp:
         self.upload_button = ttk.Button(root, text="Upload", command=self.upload_csv)
         self.upload_button.pack(pady=10)
 
+        self.append_button = ttk.Button(root, text="Append to Teradata", command=self.append_to_teradata)
+        self.append_button.pack(pady=10)
+
     def browse_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         self.file_path_label.config(text=file_path)
@@ -89,6 +92,33 @@ class CSVUploaderApp:
     def show_error(self, message):
         self.error_var.set(message)
         self.root.update_idletasks()
+    def append_to_teradata(self):
+        file_path = self.file_path_label.cget("text")
+
+        if file_path == "No file selected":
+            self.show_error("Please select a CSV file.")
+            return
+
+        table_name = "your_teradata_table"  # Replace with your actual Teradata table name
+
+        variable_types = {column: var.get() for column, var in self.variable_types.items()}
+        variable_lengths = {column: entry.get() for column, entry in self.variable_lengths.items()}
+
+        try:
+            with teradatasql.connect(host='your_teradata_host', user='your_username', password='your_password') as connection:
+                cursor = connection.cursor()
+
+                # Create table if it doesn't exist
+                create_table_query = f"CREATE TABLE {table_name} ({', '.join([f'{col} {variable_types[col]}({variable_lengths.get(col, 255)})' for col in variable_types.keys()])})"
+                cursor.execute(create_table_query)
+
+                # Append data to the table
+                df = pd.read_csv(file_path)
+                df.to_sql(table_name, connection, index=False, if_exists='append', chunksize=1000)
+
+            self.show_status(f"Data appended to {table_name} in Teradata")
+        except teradatasql.DatabaseError as e:
+            self.show_error(f"Error appending data to Teradata: {e}")
 
 if __name__ == "__main__":
     root = tk.Tk()
