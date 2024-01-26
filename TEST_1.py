@@ -207,7 +207,9 @@ class CSVUploaderApp:
         # Callback function for the "Create SQL DDL" button
         # Generates SQL INSERT statements and writes them to a file
         self.ddl_file_name = os.path.join(self.dirname, 'DDL.sql')
+        # Generate SQL INSERT statements for the entire DataFrame
         sql_insert_all = self._generate_insert_statements()
+        # Write the generated SQL statements to a file
         self._write_sql_to_file(sql_insert_all)
 
     def _generate_insert_statements(self):
@@ -215,23 +217,30 @@ class CSVUploaderApp:
         df_cols = self.df.columns.tolist()
         insert_statements = []
 
+        # Iterate over DataFrame rows and generate INSERT statements
         for row in self.df.itertuples(index=False):
             sql_insert = self._generate_single_insert(row, df_cols)
             insert_statements.append(sql_insert)
-
+            
+        # Combine all INSERT statements into a single string
         return ''.join(insert_statements)
 
     def _generate_single_insert(self, row, df_cols):
         # Helper function to generate a single SQL INSERT statement
         values = []
+        # Format each value in the row for SQL INSERT
         for value in row:
             values.append(self._format_value(value))
+        # Combine formatted values into a string
         values_str = ', '.join(map(str, map(self._format_value, row)))
+        # Create the complete INSERT statement
         return 'INSERT INTO CAS.HAS_PERFORMANCE_GUARANTEES_TEST_SH ({}) VALUES ({});\n'.format(", ".join(df_cols), values_str)
     
     
     def _format_value(self, value):
         # Helper function to format a value for SQL INSERT
+        # If the value is NaN, represent it as 'NULL', otherwise, enclose it in single quotes
+
         if pd.isna(value):
             return 'NULL'
         else:
@@ -240,12 +249,11 @@ class CSVUploaderApp:
     def _write_sql_to_file(self, sql_statements):
         # Helper function to write SQL statements to a file
         try:
+            # Attempt to open the file and write the SQL statements
             with open(self.ddl_file_name, 'w') as file:
                 file.write(sql_statements)
         except Exception as e:
             print(f"Error writing SQL statements to file: {e}")
-
-
     
     def create_insert_sql(self):
         self.ddl_file_name = os.path.join(self.dirname,'DDL.sql')
