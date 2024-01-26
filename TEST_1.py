@@ -1,3 +1,4 @@
+import logging
 import tkinter as tk
 from tkinter import ttk, filedialog
 import pandas as pd
@@ -14,6 +15,7 @@ from sqlalchemy.sql import sqltypes
 
 class CSVUploaderApp:
     def __init__(self, root):
+        self.logger = logging.getLogger(__name__)
         self.root = root
         self.root.title("CSV Uploader")
         self.status_var = tk.StringVar()
@@ -74,6 +76,7 @@ class CSVUploaderApp:
             self.transform_df()
         except pd.errors.EmptyDataError:
             self.show_error("Selected file is empty.")
+            self.logger.error("Selected file is empty.")
 
     def transform_df(self):
         try:
@@ -173,6 +176,45 @@ class CSVUploaderApp:
             self.show_status(f"UserName {username} has connected 2 Teradata :)")
         except Exception as e:
             self.show_error(f"Error connecting to Teradata: {e}")
+            self.logger.error(f"Error connecting to Teradata: {e}")
+
+    def create_insert_sql(self):
+        self.ddl_file_name = os.path.join(self.dirname, 'DDL.sql')
+        sql_insert_all = self._generate_insert_statements()
+        self._write_sql_to_file(sql_insert_all)
+
+    def _generate_insert_statements(self):
+        df_cols = self.df.columns.tolist()
+        insert_statements = []
+
+        for row in self.df.itertuples(index=False):
+            sql_insert = self._generate_single_insert(row, df_cols)
+            insert_statements.append(sql_insert)
+
+        return ''.join(insert_statements)
+
+    def _generate_single_insert(self, row, df_cols):
+        values = []
+        for value in row:
+            values.append(self._format_value(value))
+        values_str = ', '.join(map(str, map(self._format_value, row)))
+        return 'INSERT INTO CAS.HAS_PERFORMANCE_GUARANTEES_TEST_SH ({}) VALUES ({});\n'.format(", ".join(df_cols), values_str)
+    
+    
+    def _format_value(self, value):
+        if pd.isna(value):
+            return 'NULL'
+        else:
+            return "'{}'".format(str(value).replace("'", "''"))
+
+    def _write_sql_to_file(self, sql_statements):
+        try:
+            with open(self.ddl_file_name, 'w') as file:
+                file.write(sql_statements)
+        except Exception as e:
+            print(f"Error writing SQL statements to file: {e}")
+
+
     
     def create_insert_sql(self):
         self.ddl_file_name = os.path.join(self.dirname,'DDL.sql')
@@ -317,6 +359,7 @@ class CSVUploaderApp:
                 with open(error_path,'a') as file:
                     file.write(sql)
         self.show_status(f"Sucessfully Appended {row_count} Rows into {input_table_name}")
+        elf.logger.info(f"Successfully Appended {row_count} Rows into {input_table_name}")
     def disconnect_from_teradata(self):
         try:
             remove_context()
